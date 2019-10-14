@@ -1,6 +1,5 @@
 # Praca inżynierska
 #### Temat: Integracja bazy mobilnej z częścią manipulacyjną robota Velma na rzecz symulacji
-#### Autor: Jakub Sikora
 
 ### Środowisko symulacji
 Symulator został przygotowany do pracy w następującym środowisku:
