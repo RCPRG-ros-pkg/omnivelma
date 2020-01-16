@@ -1,0 +1,9 @@
+<launch>
+  <include file="$(find velma_common)/launch/velma_system.launch" />
+  <rosparam command="load"
+            file="$(find omnivelma)/config/joints.yaml"
+            ns="velmobil_joint_state_controller" />
+
+  <node name="velmobil_controller_spawner" pkg="controller_manager" type="spawner"
+    args="velmobil_joint_state_controller"/>
+</launch>

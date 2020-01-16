@@ -149,11 +149,11 @@
 		</model>
 
 		<!-- Platforma dynamiczna -->
-		<model name="omnivelma">
-			<include>
-				<uri>model://omnivelma</uri>
-			</include>
-		</model>
+		<!-- <model name="omnivelma"> -->
+			<!-- <include> -->
+				<!-- <uri>model://omnivelma</uri> -->
+			<!-- </include> -->
+		<!-- </model> -->
 	<!-- LABORATORIUM -->
 		<model name="Sala">
 			<include>

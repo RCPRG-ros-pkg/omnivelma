@@ -22,7 +22,21 @@
 #include <tf/transform_listener.h>
 #include <tf/transform_broadcaster.h>
 
-#define MODEL_NAME std::string("omnivelma")
+#include <functional>
+#include <gazebo/gazebo.hh>
+#include <gazebo/physics/physics.hh>
+#include <gazebo/common/common.hh>
+#include <ignition/math/Vector3.hh>
+#include <thread>
+#include "ros/ros.h"
+#include "ros/callback_queue.h"
+#include "ros/subscribe_options.h"
+#include "std_msgs/Float32.h"
+#include "geometry_msgs/Twist.h"
+#include <gazebo/transport/transport.hh>
+#include <gazebo/msgs/msgs.hh>
+
+#define MODEL_NAME std::string("velma")
 ///Długość jest równa sqrt(2)/2 aby tworzyć kąt 45°
 #define AXIS_LENGTH 0.707106781186548
 #define CLIENT_NAME "gazebo_ros"
@@ -42,6 +56,9 @@ public:
 		velFR = 0;
 		velRL = 0;
 		velFL = 0;
+		xVelocity = 0;
+		yVelocity = 0;
+		thVelocity = 0;
 	}
 
 public:
@@ -52,51 +69,110 @@ public:
 			
 		updateConnection = event::Events::ConnectWorldUpdateBegin(std::bind(&Omnivelma::OnUpdate, this));
 		
-		linkPrefix = std::string(model -> GetName()).append("::").append(MODEL_NAME).append("::");
+		linkPrefix = std::string(model -> GetName()).append("::");
+		//.append(MODEL_NAME).append("::");
 
-		std::string topicPrefix = std::string("/").append(model -> GetName()).append("/");
+		std::string topicPrefix = std::string("/").append(model -> GetName()).append("/").append("omnivelma/");
 
-		//odszukaj obiekty kół
-		physics::LinkPtr wheelRR = model ->  GetLink(linkPrefix + "wheel_rr");
-		physics::LinkPtr wheelRL = model ->  GetLink(linkPrefix + "wheel_rl");
-		physics::LinkPtr wheelFR = model ->  GetLink(linkPrefix + "wheel_fr");
-		physics::LinkPtr wheelFL = model ->  GetLink(linkPrefix + "wheel_fl");
+		// //odszukaj obiekty kół
+		// physics::LinkPtr wheelRR = model ->  GetLink(linkPrefix + "wheel_rr");
+		// physics::LinkPtr wheelRL = model ->  GetLink(linkPrefix + "wheel_rl");
+		// physics::LinkPtr wheelFR = model ->  GetLink(linkPrefix + "wheel_fr");
+		// physics::LinkPtr wheelFL = model ->  GetLink(linkPrefix + "wheel_fl");
 		
-		if(!wheelRR || !wheelRL || !wheelFR || !wheelFL)
-		{
-			ROS_FATAL_STREAM("Nie udało się znaleźć obiektów kół");
-		}
 
-		//odszukaj kolizje kół
-		wheelRRCollision = wheelRR -> GetCollision("wheel_rr_collision");
-		wheelRLCollision = wheelRL -> GetCollision("wheel_rl_collision");
-		wheelFRCollision = wheelFR -> GetCollision("wheel_fr_collision");
-		wheelFLCollision = wheelFL -> GetCollision("wheel_fl_collision");
-		
-		if(!wheelRRCollision || !wheelRLCollision || !wheelFRCollision || !wheelFLCollision)
-		{
-			ROS_FATAL_STREAM("Nie udało się znaleźć kolizji kół modelu");
-		}
+		// auto links = model -> GetLinks();
+		// ROS_INFO("Model links");
+		// for(auto link : links){
+		// 	ROS_INFO(link->GetName().c_str());
+		// }
 
-		motorRR = model -> GetJoint(linkPrefix + "motor_rr");
-		motorRL = model -> GetJoint(linkPrefix + "motor_rl");
-		motorFR = model -> GetJoint(linkPrefix + "motor_fr");
-		motorFL = model -> GetJoint(linkPrefix + "motor_fl");
+		// if(!wheelRR || !wheelRL || !wheelFR || !wheelFL)
+		// {
+		// 	ROS_FATAL_STREAM("Nie udało się znaleźć obiektów kół");
+		// }
+		// ROS_INFO("Znaleziono kola bazy mobilnej");
 
-		motorRR -> SetParam("fmax", 0, MAX_FORCE);
-		motorRL -> SetParam("fmax", 0, MAX_FORCE);
-		motorFR -> SetParam("fmax", 0, MAX_FORCE);
-		motorFL -> SetParam("fmax", 0, MAX_FORCE);
+		// //odszukaj kolizje kół
+		// wheelRRCollision = wheelRR -> GetCollision("wheel_rr_collision_collision");
+		// wheelRLCollision = wheelRL -> GetCollision("wheel_rl_collision_collision");
+		// wheelFRCollision = wheelFR -> GetCollision("wheel_fr_collision_collision");
+		// wheelFLCollision = wheelFL -> GetCollision("wheel_fl_collision_collision");		
+		// if(!wheelRRCollision || !wheelRLCollision || !wheelFRCollision || !wheelFLCollision)
+		// {
+		// 	ROS_FATAL_STREAM("Nie udało się znaleźć kolizji kół modelu");
+		// }
+		// ROS_INFO("Znaleziono kolizje kol bazy mobilnej");
 
-		rkP = model -> WorldPose().Rot();
-		rkQ = model -> WorldPose().Rot();
-		rkPN = model -> WorldPose().Rot();
-		rkQN = model -> WorldPose().Rot();
+		// wheelRRCollision -> GetSurface() -> FrictionPyramid() -> SetMuPrimary(0.0);
+		// wheelRRCollision -> GetSurface() -> FrictionPyramid() -> SetMuSecondary(0.0);
+		// wheelRLCollision -> GetSurface() -> FrictionPyramid() -> SetMuPrimary(0.0);
+		// wheelRLCollision -> GetSurface() -> FrictionPyramid() -> SetMuSecondary(0.0);
+		// wheelFRCollision -> GetSurface() -> FrictionPyramid() -> SetMuPrimary(0.0);
+		// wheelFRCollision -> GetSurface() -> FrictionPyramid() -> SetMuSecondary(0.0);
+		// wheelFLCollision -> GetSurface() -> FrictionPyramid() -> SetMuPrimary(0.0);
+		// wheelFLCollision -> GetSurface() -> FrictionPyramid() -> SetMuSecondary(0.0);
 
-		if(!motorRR || !motorRL || !motorFR || !motorFL)
-		{
-			ROS_FATAL_STREAM("Nie udało się znaleźć przegubów silników");
-		}
+		// auto joints = model -> GetJoints();
+		// ROS_INFO("Model joints");
+		// for(auto joint : joints){
+		// 	ROS_INFO(joint->GetName().c_str());
+		// }
+
+		// motorRR = model -> GetJoint(linkPrefix + "omni_joint_x");
+		// motorRL = model -> GetJoint(linkPrefix + "omni_joint_y");
+		// motorFR = model -> GetJoint(linkPrefix + "motor_fr");
+		// motorFL = model -> GetJoint(linkPrefix + "motor_fl");
+
+		// if(!motorRR || !motorRL)
+		// {
+		// 	ROS_FATAL_STREAM("Nie udało się znaleźć motorow");
+		// }
+
+		// ROS_INFO("Znaleziono motory");
+
+		// ROS_INFO("Controller set start");
+		// this->wheelsController.reset(new physics::JointController(this->model));
+		// this->wheelsController->AddJoint(motorRR);
+		// this->wheelsController->AddJoint(motorRL);
+		// // this->wheelsController->AddJoint(motorFR);
+		// // this->wheelsController->AddJoint(motorFL);
+
+		// const double P = 5.015;
+		// const double I = 0.10;
+		// const double D = 0.0001;
+		// const double cmdMax = 50;
+		// const double integralLimit = 10;
+
+		// std::string rrMotorName = motorRR->GetScopedName();
+		// wheelsController->SetVelocityPID(rrMotorName, common::PID(P, I, D, integralLimit, -integralLimit, cmdMax, 2*cmdMax));
+
+		// std::string rlMotorName = motorRL->GetScopedName();
+		// wheelsController->SetVelocityPID(rlMotorName, common::PID(P, I, D, integralLimit, -integralLimit, cmdMax, 2*cmdMax));
+
+		// std::string frMotorName = motorFR->GetScopedName();
+		// wheelsController->SetVelocityPID(frMotorName, common::PID(P, I, D, integralLimit, -integralLimit, cmdMax, 2*cmdMax));
+
+		// std::string flMotorName = motorFL->GetScopedName();
+		// wheelsController->SetVelocityPID(flMotorName, common::PID(P, I, D, integralLimit, -integralLimit, cmdMax, 2*cmdMax));
+
+		// wheelsController->SetVelocityTarget(rrMotorName, 0.3);
+		// wheelsController->SetVelocityTarget(rlMotorName, 0.3);
+		// wheelsController->SetVelocityTarget(frMotorName, 0.0);
+		// wheelsController->SetVelocityTarget(flMotorName, 0.0);
+
+		// wheelsController->Update();
+		// ROS_INFO(std::string("Controller set with params: P=").append(std::to_string(P)).append("; I=").append(std::to_string(I)).append("; D=").append(std::to_string(D)).c_str());
+
+		// rkP = model -> WorldPose().Rot();
+		// rkQ = model -> WorldPose().Rot();
+		// rkPN = model -> WorldPose().Rot();
+		// rkQN = model -> WorldPose().Rot();
+
+		// if(!motorRR || !motorRL || !motorFR || !motorFL)
+		// {
+		// 	ROS_FATAL_STREAM("Nie udało się znaleźć przegubów silników");
+		// }
 
 		//inicjalizacja ROSa
 		if (!ros::isInitialized())
@@ -122,6 +198,17 @@ public:
 			ROS_FATAL_STREAM("Nie udało się stworzyć odbiornika " << topicPrefix << "kinect_rotation");
 		}
 
+		const std::string twistTopic = "/omnivelma/cmd_vel";
+		rosTwistSub = rosNode->subscribe<geometry_msgs::Twist>(twistTopic, 10, std::bind(&Omnivelma::OnTwistMsg, this, std::placeholders::_1));
+
+		//stwórz topic do nadawania pozycji
+		const std::string velsTopicName = "vels/computed";
+		rosVels = rosNode -> advertise<omnivelma_msgs::Vels>(topicPrefix + velsTopicName, 10);
+		if(!rosVels)
+		{
+			ROS_FATAL_STREAM("Nie udało się stworzyć nadajnika " << topicPrefix << velsTopicName);
+		}
+
 		//stwórz topic do nadawania pozycji
 		rosPose = rosNode -> advertise<geometry_msgs::PoseStamped>(topicPrefix + "pose", 10);
 		if(!rosPose)
@@ -138,6 +225,12 @@ public:
 
 		//stwórz topic do nadawania prędkości
 		rosTwist = rosNode -> advertise<geometry_msgs::TwistStamped>(topicPrefix + "twist", 10);
+		if(!rosTwist)
+		{
+			ROS_FATAL_STREAM("Nie udało się stworzyć nadajnika " << topicPrefix << "twist");
+		}
+
+		rosTorque = rosNode -> advertise<geometry_msgs::TwistStamped>(topicPrefix + "twist", 10);
 		if(!rosTwist)
 		{
 			ROS_FATAL_STREAM("Nie udało się stworzyć nadajnika " << topicPrefix << "twist");
@@ -167,23 +260,72 @@ public:
 		}
 		
 		//powiadom o gotowości
-		ROS_DEBUG_STREAM("Omnivelma zainicjalizowana");
+		ROS_INFO("Omnivelma zainicjalizowana");
 	}
 
 
 private:
 
 	void SetVelocities()
-	{
-		//nadaj poprzednie prędkości kół
-		if(!std::isnan(velRR))
-			motorRR -> SetParam("vel", 0, velRR);
-		if(!std::isnan(velRL))
-			motorRL -> SetParam("vel", 0, velRL);
-		if(!std::isnan(velFR))
-			motorFR -> SetParam("vel", 0, velFR);
-		if(!std::isnan(velFL))
-			motorFL -> SetParam("vel", 0, velFL);
+	{	
+		const double frVel = velFR;
+		const double flVel = velFL;
+		const double rlVel = velRL;
+		const double rrVel = velRR;
+
+		const double wheelRadius = 0.1016;
+		const double modelWidth = 0.76;
+		const double modelLength = 0.72;
+
+		double velX = -frVel + flVel - rlVel + rrVel;
+		double velY = frVel + flVel + rlVel + rrVel;
+		velX *= 0.25 * wheelRadius;
+		velY *= 0.25 * wheelRadius;
+		ignition::math::Vector3<double> transVect = ignition::math::Vector3<double>(velX, velY, 0);
+		double k = 2.0/(modelWidth + modelLength);
+		double rot = frVel - flVel - rlVel + rrVel;
+		rot *= k * 0.25 * wheelRadius;
+
+		//przerabianie lokalnych wektorów na globalne
+		ignition::math::Quaternion<double> modelRot = model -> WorldPose().Rot();
+		transVect = modelRot.RotateVector(transVect);
+
+		// model -> SetAngularVel(ignition::math::Vector3<double>(0,0,rot));
+		// model -> SetLinearVel(transVect);
+
+
+		// std::string rrMotorName = motorRR->GetScopedName();
+		// std::string rlMotorName = motorRL->GetScopedName();
+		// std::string frMotorName = motorFR->GetScopedName();
+		// std::string flMotorName = motorFL->GetScopedName();
+
+		// if(!std::isnan(velRR)){
+		// 	wheelsController->SetVelocityTarget(rrMotorName, velRR);
+		// }
+		// if(!std::isnan(velRL)){
+		// 	wheelsController->SetVelocityTarget(rlMotorName, velRL);
+		// }
+		// if(!std::isnan(velFR)){
+		// 	wheelsController->SetVelocityTarget(frMotorName, velFR);
+		// }
+		// if(!std::isnan(velFL)){
+		// 	wheelsController->SetVelocityTarget(flMotorName, velFL);
+		// }
+		//wheelsController->Update();
+
+		/*
+		auto pids = wheelsController->GetVelocityPIDs();
+		double errorP, errorI, errorD;
+		pids[rrMotorName].GetErrors(errorP, errorI, errorD);
+		auto cmd = pids[rrMotorName].GetCmd();
+		auto forces = wheelsController->GetForces();
+		auto vels = motorRR->GetVelocity(0);
+
+		ROS_INFO(std::string("velocity: ").append(std::to_string(vels)).c_str());
+		ROS_INFO(std::string("cmd: ").append(std::to_string(cmd)).c_str());
+		ROS_INFO(std::string("forces: ").append(std::to_string(forces[rrMotorName])).c_str());
+		ROS_INFO(std::string("error: ").append(std::to_string(velRR - vels)).c_str());
+		*/
 	}
 
 	void SetKinectRotation(double angle)
@@ -198,22 +340,37 @@ private:
 	///Funkcja podłączana do zdarzenia aktualizacji
 	void OnUpdate()
 	{
-		//ustaw kierunek wektorów tarcia
-		//kierunek wektora o większym współczynniku tarcia jest ustalony w lokalnym, dla koła, układzie współrzędnych
-		//zatem wektor należy obrócić zgodnie z modelem i odwrotnie do obrotu koła, aby wyjściowo był w płaszczyźnie platformy
-		const ignition::math::Quaternion<double> modelRot = model -> WorldPose().Rot();
-		const ignition::math::Quaternion<double> wheelRRRot = wheelRRCollision -> WorldPose().Rot();
-		const ignition::math::Quaternion<double> wheelRLRot = wheelRLCollision -> WorldPose().Rot();
-		const ignition::math::Quaternion<double> wheelFRRot = wheelFRCollision -> WorldPose().Rot();
-		const ignition::math::Quaternion<double> wheelFLRot = wheelFLCollision -> WorldPose().Rot();
+		// ustaw kierunek wektorów tarcia
+		// kierunek wektora o większym współczynniku tarcia jest ustalony w lokalnym, dla koła, układzie współrzędnych
+		// zatem wektor należy obrócić zgodnie z modelem i odwrotnie do obrotu koła, aby wyjściowo był w płaszczyźnie platformy
+		// const ignition::math::Quaternion<double> modelRot = model -> WorldPose().Rot();
+		// const ignition::math::Quaternion<double> wheelRRRot = wheelRRCollision -> WorldPose().Rot();
+		// const ignition::math::Quaternion<double> wheelRLRot = wheelRLCollision -> WorldPose().Rot();
+		// const ignition::math::Quaternion<double> wheelFRRot = wheelFRCollision -> WorldPose().Rot();
+		// const ignition::math::Quaternion<double> wheelFLRot = wheelFLCollision -> WorldPose().Rot();
 
-		wheelRRCollision -> GetSurface() -> FrictionPyramid() -> direction1 = wheelRRRot.RotateVectorReverse(modelRot.RotateVector(ignition::math::Vector3<double>(AXIS_LENGTH, -AXIS_LENGTH, 0)));
-		wheelRLCollision -> GetSurface() -> FrictionPyramid() -> direction1 = wheelRLRot.RotateVectorReverse(modelRot.RotateVector(ignition::math::Vector3<double>(AXIS_LENGTH, AXIS_LENGTH, 0)));
-		wheelFRCollision -> GetSurface() -> FrictionPyramid() -> direction1 = wheelFRRot.RotateVectorReverse(modelRot.RotateVector(ignition::math::Vector3<double>(-AXIS_LENGTH, -AXIS_LENGTH, 0)));
-		wheelFLCollision -> GetSurface() -> FrictionPyramid() -> direction1 = wheelFLRot.RotateVectorReverse(modelRot.RotateVector(ignition::math::Vector3<double>(-AXIS_LENGTH, AXIS_LENGTH, 0)));
+		// wheelRRCollision -> GetSurface() -> FrictionPyramid() -> direction1 = wheelRRRot.RotateVectorReverse(modelRot.RotateVector(ignition::math::Vector3<double>(AXIS_LENGTH, -AXIS_LENGTH, 0)));
+		// wheelRLCollision -> GetSurface() -> FrictionPyramid() -> direction1 = wheelRLRot.RotateVectorReverse(modelRot.RotateVector(ignition::math::Vector3<double>(AXIS_LENGTH, AXIS_LENGTH, 0)));
+		// wheelFRCollision -> GetSurface() -> FrictionPyramid() -> direction1 = wheelFRRot.RotateVectorReverse(modelRot.RotateVector(ignition::math::Vector3<double>(-AXIS_LENGTH, -AXIS_LENGTH, 0)));
+		// wheelFLCollision -> GetSurface() -> FrictionPyramid() -> direction1 = wheelFLRot.RotateVectorReverse(modelRot.RotateVector(ignition::math::Vector3<double>(-AXIS_LENGTH, AXIS_LENGTH, 0)));
 
-		//ROS_WARN_STREAM("VELMA: " + boost::lexical_cast<std::string>(kinectRot.x) + " " + boost::lexical_cast<std::string>(kinectRot.y) + " " + boost::lexical_cast<std::string>(kinectRot.z) + " " + boost::lexical_cast<std::string>(kinectRot.w));
+		// //ROS_WARN_STREAM("VELMA: " + boost::lexical_cast<std::string>(kinectRot.x) + " " + boost::lexical_cast<std::string>(kinectRot.y) + " " + boost::lexical_cast<std::string>(kinectRot.z) + " " + boost::lexical_cast<std::string>(kinectRot.w));
 
+		const double wheelRadius = 0.1;
+		const double wheelRollerRadius = 0.02;
+		const double modelWidth = 0.76;
+		const double modelLength = 0.72;
+
+
+		const double lengths = modelWidth + modelLength;
+		const double radiuses = wheelRadius + wheelRollerRadius; 
+
+		omnivelma_msgs::Vels velsComputed;
+		velsComputed.fl = (xVelocity - yVelocity - thVelocity*lengths)/ radiuses;
+		velsComputed.fr = (xVelocity + yVelocity + thVelocity*lengths)/ radiuses;
+		velsComputed.rl = (xVelocity + yVelocity - thVelocity*lengths)/ radiuses;
+		velsComputed.rr = (xVelocity - yVelocity + thVelocity*lengths)/ radiuses;
+		rosVels.publish(velsComputed);
 
 		//wyślij pozycję
 		const ignition::math::Pose3<double>& pose = model -> WorldPose();
@@ -227,74 +384,108 @@ private:
 		poseMsg.pose.orientation.w = pose.Rot().W();
 		poseMsg.header.seq = counter;
 		poseMsg.header.stamp = ros::Time::now();
-		poseMsg.header.frame_id = MAP_TF;
+		poseMsg.header.frame_id = "world";
 		rosPose.publish(poseMsg);
 
-		//wyślij enkodery
-		omnivelma_msgs::EncodersStamped encMsg;
-		encMsg.encoders.velocity.rr = motorRR -> GetVelocity(0);
-		encMsg.encoders.angle.rr = motorRR -> Position(0);
-		encMsg.encoders.velocity.rl = motorRL -> GetVelocity(0);
-		encMsg.encoders.angle.rl = motorRL -> Position(0);
-		encMsg.encoders.velocity.fr = motorFR -> GetVelocity(0);
-		encMsg.encoders.angle.fr = motorFR -> Position(0);
-		encMsg.encoders.velocity.fl = motorFL -> GetVelocity(0);
-		encMsg.encoders.angle.fl = motorFL -> Position(0);
-		encMsg.header.seq = counter;
-		encMsg.header.stamp = ros::Time::now();
-		encMsg.header.frame_id = "0";
-		rosEnc.publish(encMsg);
+		// tf::Transform transformX;
+		// tf::Vector3 translationX(0, 0, 0);
+		// transformX.setOrigin(translationX);
+		// tf::Quaternion rotationX(pose.Rot().X(), pose.Rot().Y(), pose.Rot().Z(), pose.Rot().W());
+		// transformX.setRotation(rotationX);
+		// omnivelma_broadcaster.sendTransform(tf::StampedTransform(transformX, ros::Time::now(), "world", "omnitorso_x"));
 
-		//wyślij prędkość
-		const ignition::math::Vector3<double> linVel = model -> WorldLinearVel();
-		const ignition::math::Vector3<double> angVel = model -> WorldAngularVel();
-		geometry_msgs::TwistStamped twistMsg;
-		twistMsg.twist.linear.x = linVel.X();
-		twistMsg.twist.linear.y = linVel.Y();
-		twistMsg.twist.linear.z = linVel.Z();
-		twistMsg.twist.angular.x = angVel.X();
-		twistMsg.twist.angular.y = angVel.Y();
-		twistMsg.twist.angular.z = angVel.Z();
-		twistMsg.header.seq = counter;
-		twistMsg.header.stamp = ros::Time::now();
-		twistMsg.header.frame_id = MAP_TF;
-		rosTwist.publish(twistMsg);
+		// tf::Transform transformY;
+		// tf::Vector3 translationY(pose.Pos().X(), 0, 0);
+		// transformY.setOrigin(translationX);
+		// tf::Quaternion rotationY(0, 0, 0, 1);
+		// transformY.setRotation(rotationY);
+		// omnivelma_broadcaster.sendTransform(tf::StampedTransform(transformY, ros::Time::now(), "omnitorso_x", "omnitorso_y"));
+
+		// tf::Transform transformZ;
+		// tf::Vector3 translationZ(0, pose.Pos().Y(), 0);
+		// transformZ.setOrigin(translationZ);
+		// tf::Quaternion rotationZ(0, 0, 0, 1);
+		// transformZ.setRotation(rotationZ);
+		// omnivelma_broadcaster.sendTransform(tf::StampedTransform(transformZ, ros::Time::now(), "omnitorso_y", "torso_base"));
+
+		tf::Transform transform;
+		tf::Vector3 translation(pose.Pos().X(), pose.Pos().Y(), pose.Pos().Z());
+		transform.setOrigin(translation);
+		tf::Quaternion rotation(pose.Rot().X(), pose.Rot().Y(), pose.Rot().Z(), pose.Rot().W());
+		transform.setRotation(rotation);
+		omnivelma_broadcaster.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "odom", "world"));
+
+
+		//ROS_INFO("wyslij pozycje");
+
+		//wyślij enkodery
+		// omnivelma_msgs::EncodersStamped encMsg;
+		// encMsg.encoders.velocity.rr = motorRR -> GetVelocity(0);
+		// encMsg.encoders.angle.rr = motorRR -> Position(0);
+		// encMsg.encoders.velocity.rl = motorRL -> GetVelocity(0);
+		// encMsg.encoders.angle.rl = motorRL -> Position(0);
+		// encMsg.encoders.velocity.fr = motorFR -> GetVelocity(0);
+		// encMsg.encoders.angle.fr = motorFR -> Position(0);
+		// encMsg.encoders.velocity.fl = motorFL -> GetVelocity(0);
+		// encMsg.encoders.angle.fl = motorFL -> Position(0);
+		// encMsg.header.seq = counter;
+		// encMsg.header.stamp = ros::Time::now();
+		// encMsg.header.frame_id = "0";
+		// rosEnc.publish(encMsg);
+		// //ROS_INFO("wyslij enkodery");
+
+		// //wyślij prędkość
+		// const ignition::math::Vector3<double> linVel = model -> WorldLinearVel();
+		// const ignition::math::Vector3<double> angVel = model -> WorldAngularVel();
+		// geometry_msgs::TwistStamped twistMsg;
+		// twistMsg.twist.linear.x = linVel.X();
+		// twistMsg.twist.linear.y = linVel.Y();
+		// twistMsg.twist.linear.z = linVel.Z();
+		// twistMsg.twist.angular.x = angVel.X();
+		// twistMsg.twist.angular.y = angVel.Y();
+		// twistMsg.twist.angular.z = angVel.Z();
+		// twistMsg.header.seq = counter;
+		// twistMsg.header.stamp = ros::Time::now();
+		// twistMsg.header.frame_id = MAP_TF;
+		// rosTwist.publish(twistMsg);
+		//ROS_INFO("wyslij predkosc");
 		
 		//Autor: Piotr Walas
-		//wyslij odometrie
-		nav_msgs::Odometry odometryMsg;
-		odometryMsg.header.seq = counter;
-		odometryMsg.header.stamp = ros::Time::now();
-		odometryMsg.header.frame_id = MAP_TF;
-		odometryMsg.pose.pose = poseMsg.pose;
-		odometryMsg.twist.twist = twistMsg.twist;
-		rosOdom.publish(odometryMsg);
+		// //wyslij odometrie
+		// nav_msgs::Odometry odometryMsg;
+		// odometryMsg.header.seq = counter;
+		// odometryMsg.header.stamp = ros::Time::now();
+		// odometryMsg.header.frame_id = MAP_TF;
+		// odometryMsg.pose.pose = poseMsg.pose;
+		// odometryMsg.twist.twist = twistMsg.twist;
+		// rosOdom.publish(odometryMsg);
+		//ROS_INFO("wyslij odom");
 		
 		//wyślij ramkę (zakładamy ramkę map w 0,0,0)
-		geometry_msgs::TransformStamped transMsg;
-		transMsg.header.stamp = ros::Time::now();
-		transMsg.header.frame_id = MAP_TF;
-		transMsg.child_frame_id = "base_footprint";
-		transMsg.transform.translation.x = pose.Pos().X();
-		transMsg.transform.translation.y = pose.Pos().Y();
-		transMsg.transform.translation.z = pose.Pos().Z();
+		// geometry_msgs::TransformStamped transMsg;
+		// transMsg.header.stamp = ros::Time::now();
+		// transMsg.header.frame_id = "world";
+		// transMsg.child_frame_id = "torso_base";
+		// transMsg.transform.translation.x = pose.Pos().X();
+		// transMsg.transform.translation.y = pose.Pos().Y();
+		// transMsg.transform.translation.z = pose.Pos().Z();
 
-		transMsg.transform.rotation.x = pose.Rot().X();
-		transMsg.transform.rotation.y = pose.Rot().Y();
-		transMsg.transform.rotation.z = pose.Rot().Z();
-		transMsg.transform.rotation.w = pose.Rot().W();
-		framePublisher.sendTransform(transMsg);
+		// transMsg.transform.rotation.x = pose.Rot().X();
+		// transMsg.transform.rotation.y = pose.Rot().Y();
+		// transMsg.transform.rotation.z = pose.Rot().Z();
+		// transMsg.transform.rotation.w = pose.Rot().W();
+		// framePublisher.sendTransform(transMsg);
 
-		tf::Quaternion rot = tf::createQuaternionFromRPY(0.0, 0.0, 0.0);
+		// tf::Quaternion rot = tf::createQuaternionFromRPY(0.0, 0.0, 0.0);
 
-		omnivelma_broadcaster.sendTransform(
-		tf::StampedTransform(
-			tf::Transform(rot, tf::Vector3(0.0, 0.0, 0.0)),
-			ros::Time::now(), "base_footprint", MODEL_NAME));
-
+		// omnivelma_broadcaster.sendTransform(
+		// tf::StampedTransform(
+		// 	tf::Transform(rot, tf::Vector3(0.0, 0.0, 0.0)),
+		// 	ros::Time::now(), "base_footprint", MODEL_NAME));
+		//ROS_INFO("wyslij pozycje");
 
 		//kinect
-		
+		/*
 		ignition::math::Pose3<double> poseKinectR = model -> GetLink(linkPrefix + "ownKinect::" + "kinect_base") -> WorldPose();
 		poseKinectR.Set(poseKinectR.Pos() ,model->WorldPose().Rot() * rkQ);
 
@@ -314,11 +505,12 @@ private:
 		transKRMsg.transform.rotation.z = rkQ.Z();
 		transKRMsg.transform.rotation.w = rkQ.W();
 
-		framePublisher.sendTransform(transKRMsg);
+		framePublisher.sendTransform(transKRMsg);*/
 		
 		counter++;
 
-		SetVelocities();
+		//SetVelocities();
+		//ROS_INFO("end update");
 	}
 
 	///Ustaw tarcia dla kół
@@ -394,6 +586,12 @@ private:
 		return true;
 	}
 
+	void OnTwistMsg(const geometry_msgs::Twist::ConstPtr& msg){
+		xVelocity = msg->linear.x;
+		yVelocity = msg->linear.y;
+		thVelocity = msg->angular.z;
+	}
+
 	///Pobierz wiadomość od ROSa
 	void OnRosMsg(const omnivelma_msgs::Vels::ConstPtr& msg)
 	{
@@ -431,16 +629,34 @@ private:
 	physics::CollisionPtr wheelFRCollision;
 	physics::CollisionPtr wheelFLCollision;
 
+	// std::shared_ptr<physics::JointController> controllerRR;
+	// std::shared_ptr<physics::JointController> controllerRL;
+	// std::shared_ptr<physics::JointController> controllerFR;
+	// std::shared_ptr<physics::JointController> controllerFL;
+
+	physics::JointControllerPtr wheelsController;
+
+	// std::string rrMotorName;
+	// std::string rlMotorName;
+	// std::string frMotorName;
+	// std::string flMotorName;
+
 	double velRR;
 	double velRL;
 	double velFR;
 	double velFL;
+
+	double xVelocity;
+	double yVelocity;
+	double thVelocity;
 
 	///Node dla ROSa
 	std::unique_ptr<ros::NodeHandle> rosNode;
 
 	///Odbiornik prędkości kół
 	ros::Subscriber rosSub;
+
+	ros::Subscriber rosTwistSub;
 
 	//PW
 	//odbiornik zadanej predkosci obrotu kinecta
@@ -454,6 +670,12 @@ private:
 
 	///Nadajnik prędkości
 	ros::Publisher rosTwist;
+
+	//Nadajnik momentow
+	ros::Publisher rosTorque;
+
+	//Nadajnik prędkości kół
+	ros::Publisher rosVels;
 	
 	//Nadajnik Odometrii
 	//Autor: Piotr Walas
@@ -478,7 +700,6 @@ private:
 	ignition::math::Quaternion<double> rkPN;
 	ignition::math::Quaternion<double> rkQN;
 	double ft = 0.1;
-
 };
 
 //zarejestruj wtyczkę

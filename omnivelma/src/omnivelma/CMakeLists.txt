@@ -47,3 +47,15 @@ add_library(monokl_chain src/monokl_chain.cpp)
 add_dependencies(monokl_chain ${catkin_EXPORTED_TARGETS})
 target_link_libraries(monokl_chain ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES} ${roscpp_LIBRARIES})
 
+install(DIRECTORY materials/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/materials
+)
+
+install(DIRECTORY meshes/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/meshes
+)
+
+install(DIRECTORY ./
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/
+)
+

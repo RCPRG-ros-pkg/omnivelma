@@ -419,9 +419,9 @@
 		</joint>
 
 	<!--KINECT SUBMODEL SECTION-->
-	    <include>
+		    <include>
 			<uri>model://ownKinect</uri>
-			<pose>0 0 1.5 0 0 0</pose>
+			<pose>0 0 1.5 0 0 0</pose> -->
 			<!--<pose>0 0 1.536 0 0 0</pose>-->
 		</include>	
 		<joint name="kinect_rotator" type="revolute">
@@ -431,7 +431,7 @@
 			<axis>
 				<xyz>0 0 1</xyz>
 			</axis>
-		</joint>
+		</joint> 
 	</model>
 </sdf>
 

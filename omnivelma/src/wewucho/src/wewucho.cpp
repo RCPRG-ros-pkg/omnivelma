@@ -55,6 +55,7 @@ public:
 		}
 
 		//powiadom o gotowości
+		ROS_INFO("wewucho initialized");
 		ROS_DEBUG_STREAM("Wewucho zainicjalizowane");
 	}
 

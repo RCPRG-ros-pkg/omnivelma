@@ -21,6 +21,7 @@ add_service_files(
 	FILES
 	SetFriction.srv
 	SetInertia.srv
+	SetVelocity.srv
 )
 
 generate_messages(

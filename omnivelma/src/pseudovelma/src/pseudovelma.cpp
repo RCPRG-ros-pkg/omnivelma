@@ -14,7 +14,7 @@
 #include <geometry_msgs/TwistStamped.h>
 #include <nav_msgs/Odometry.h>
 
-#define MODEL_NAME std::string("pseudovelma")
+#define MODEL_NAME std::string("velma")
 #define MAP_TF "map"
 
 namespace gazebo
@@ -45,8 +45,10 @@ public:
 	{
 		model = parent;
 
-		linkPrefix = std::string(model -> GetName()).append("::").append(MODEL_NAME).append("::");
-		std::string topicPrefix = std::string("/").append(model -> GetName()).append("/");
+		//linkPrefix = std::string(model -> GetName()).append("::").append(MODEL_NAME).append("::");
+		linkPrefix = std::string(model -> GetName()).append("::");
+		//std::string topicPrefix = std::string("/").append(model -> GetName()).append("/");
+		std::string topicPrefix = std::string("/").append(model -> GetName()).append("/").append("omnivelma/");
 
 		//podłączenie do wydarznia aktualizacji
 		updateConnection = event::Events::ConnectWorldUpdateBegin(std::bind(&Pseudovelma::OnUpdate, this));
