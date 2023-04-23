@@ -9,7 +9,7 @@ Symulator został przygotowany do pracy w następującym środowisku:
 
 ### Przygotowanie środowiska 
 W pierwszej kolejności należy w katalogu roboczym `~/catkin_ws/src` sklonować repozytorium za pomocą
-polecenia `git clone https://github.com/kubasikora/thesis.git`. Po sklonowaniu repozytorium należy przenieść
+polecenia `git clone https://github.com/RCPRG-ros-pkg/omnivelma.git`. Po sklonowaniu repozytorium należy przenieść
 się do folderu głównego katalogu roboczego `cd ..` i zbudować symulator za pomocą polecenia `catkin_make`.
 Po zbudowaniu, należy załadować środowisko symulatora za pomocą polecenia `source devel/setup.bash`.
 
